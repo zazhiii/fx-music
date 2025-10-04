@@ -1,0 +1,4 @@
+--name "FxMusic"
+--type app-image
+--runtime-image target/image
+--module fx.music/com.zazhi.fxmusic.FxMusicApp
