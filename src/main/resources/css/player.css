@@ -123,3 +123,10 @@
     -fx-background-color: #F5F5DC;
 }
 
+.progress-slider .thumb{
+    -fx-background-color: #8B5A2B;
+}
+
+.progress-slider .track {
+    -fx-pref-width: 3px;
+}

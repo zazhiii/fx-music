@@ -4,19 +4,19 @@ import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.collections.ObservableMap;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Bounds;
-import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.Region;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import javafx.util.Callback;
 import javafx.util.Duration;
 
 import java.io.File;
@@ -39,6 +39,32 @@ public class PlayerController {
     @FXML
     private ListView<File> musicListView;
 
+    private MediaPlayer mediaPlayer;
+
+    private Slider soundSlider;
+
+    @FXML
+    private Slider progressSlider;
+
+    @FXML
+    private Label timeLabel;
+
+    @FXML
+    private ToggleButton playBtn;
+
+    @FXML
+    void OnPlayOrPauseAction(MouseEvent event) {
+        if (mediaPlayer == null) {
+            return;
+        }
+        MediaPlayer.Status status = mediaPlayer.getStatus();
+        if (status == MediaPlayer.Status.PLAYING) {
+            mediaPlayer.pause();
+        } else {
+            mediaPlayer.play();
+        }
+    }
+
     @FXML
     void initialize() {
         initAnimation();
@@ -57,20 +83,60 @@ public class PlayerController {
                        return;
                     }
 
-                    BorderPane borderPane = new BorderPane();
+//                    BorderPane borderPane = new BorderPane();
                     String fileName = item.getName();
                     Label label = new Label(fileName.substring(0, fileName.lastIndexOf('.')));
-                    BorderPane.setAlignment(label, Pos.CENTER_LEFT);
-                    Button button = new Button();
-                    button.getStyleClass().add("delete-button");
-                    button.getStyleClass().add("svg-btn");
-                    button.setGraphic(new Region());
-                    borderPane.setCenter(label);
-                    borderPane.setRight(button);
-                    setGraphic(borderPane);
+//                    BorderPane.setAlignment(label, Pos.CENTER_LEFT);
+//                    Button button = new Button();
+//                    button.getStyleClass().add("delete-button");
+//                    button.getStyleClass().add("svg-btn");
+//                    button.setGraphic(new Region());
+//                    borderPane.setCenter(label);
+//                    borderPane.setRight(button);
+                    setGraphic(label);
 
                 }
             };
+        });
+
+        musicListView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue != null) {
+                if (mediaPlayer != null) {
+                    mediaPlayer.stop();
+                }
+                Media media = new Media(newValue.toURI().toString());
+                mediaPlayer = new MediaPlayer(media);
+                mediaPlayer.play();
+
+                // 绑定音量
+                mediaPlayer.volumeProperty().bind(soundSlider.valueProperty().divide(100));
+
+                // 绑定进度
+                mediaPlayer.currentTimeProperty().addListener((obs, oldTime, newTime) -> {
+                    double progress = newTime.toMillis() / mediaPlayer.getTotalDuration().toMillis() * 100.0;
+                    progressSlider.setValue(progress);
+                    // 更新时间显示
+                    Duration total = mediaPlayer.getTotalDuration();
+                    int currentSeconds = (int) newTime.toSeconds();
+                    int totalSeconds = (int) total.toSeconds();
+                    timeLabel.setText(String.format("%02d:%02d / %02d:%02d",
+                            currentSeconds / 60, currentSeconds % 60,
+                            totalSeconds / 60, totalSeconds % 60));
+                });
+                // 拖动/点击进度条
+                progressSlider.setOnMouseClicked(event -> {
+                    double progress = progressSlider.getValue() / 100.0;
+                    Duration seekTime = mediaPlayer.getTotalDuration().multiply(progress);
+                    mediaPlayer.seek(seekTime);
+                });
+                progressSlider.setOnMouseDragged(event -> {
+                    double progress = progressSlider.getValue() / 100.0;
+                    Duration seekTime = mediaPlayer.getTotalDuration().multiply(progress);
+                    mediaPlayer.seek(seekTime);
+                });
+
+                playBtn.setSelected(true);
+            }
         });
     }
 
@@ -78,7 +144,10 @@ public class PlayerController {
         soundPopup = new ContextMenu(new SeparatorMenuItem());
         Parent root = null;
         try {
-            root = FXMLLoader.load(getClass().getResource("/fxml/sound.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/sound.fxml"));
+            root = loader.load();
+            ObservableMap<String, Object> namespace = loader.getNamespace();
+            soundSlider = (Slider) namespace.get("soundSlider");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -143,9 +212,8 @@ public class PlayerController {
     @FXML
     void onAddMusicAction(MouseEvent event) {
         FileChooser fileChooser = new FileChooser();
-        // TODO
-//        fileChooser.getExtensionFilters()
-//                .add(new FileChooser.ExtensionFilter("Music Files", "*.mp3", "*.wav", "*.flac"));
+        fileChooser.getExtensionFilters()
+                .add(new FileChooser.ExtensionFilter("Music Files", "*.mp3", "*.wav", "*.flac"));
         List<File> files = fileChooser.showOpenMultipleDialog(getWindow());
         if (files == null || files.isEmpty()) {
             return;
